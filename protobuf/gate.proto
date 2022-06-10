@@ -1,0 +1,46 @@
+syntax="proto3";
+
+package com.axgrid.axgate;
+
+option java_package = "com.axgrid.gogate";
+option java_multiple_files = true;
+option csharp_namespace = "AxGrid.Internal.Proto";
+
+message Packet {
+    GateRequest requests = 1;
+    GateResponse responses = 2;
+    GateHandshake handshake = 3;
+}
+
+message GateRequest {
+    uint64 id = 1;
+    string name = 2;
+    string method = 10;
+    string url = 11;
+    string host = 12;
+    repeated GateHeader header = 13;
+    bytes body = 14;
+    int64 content_length = 15;
+    string remote_addr = 16;
+}
+
+message GateHeader {
+    string key = 1;
+    repeated string values = 2;
+}
+
+message GateResponse {
+    uint64 id = 1;
+    string name = 2;
+    int32 status_code = 10;
+    repeated GateHeader header = 13;
+    bytes body = 14;
+    int64 content_length = 15;
+}
+
+
+message GateHandshake {
+    string service = 1;
+    bool watch_only = 2;
+}
+
