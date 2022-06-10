@@ -1,0 +1,16 @@
+package main
+
+import (
+	"github.com/axgrid/axgate/tcp"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
+	"os"
+)
+
+func main() {
+	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
+	level := zerolog.InfoLevel
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: "15:04:05,000"}).Level(level)
+
+	tcp.NewHTTPClient("bad", "localhost:9090", "http://ya.ru/")
+}

@@ -10,6 +10,12 @@ message Packet {
     GateRequest requests = 1;
     GateResponse responses = 2;
     GateHandshake handshake = 3;
+    GatePing ping = 4;
+    GatePing pong = 5;
+}
+
+message GatePing {
+    int64 time = 1;
 }
 
 message GateRequest {
