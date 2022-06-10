@@ -75,46 +75,99 @@ func ping(conn net.Conn) chan bool {
 	return closeChan
 }
 
-func clientLoop(conn net.Conn, listener fListener) error {
-	for {
-		b, err := readTL(conn)
-		if err != nil {
-			return err
+func clientLoop(conn net.Conn, listener fListener) (err error) {
+	dataChannel := make(chan []byte)
+	go func() {
+		for {
+			data, ok := <-dataChannel
+			if !ok {
+				log.Debug().Msg("channel closed")
+				return
+			}
+			var p pproto.Packet
+			err = proto.Unmarshal(data, &p)
+			if err != nil {
+				log.Error().Err(err).Msg("fail to unmarshal")
+				conn.Close()
+				return
+			}
+
+			switch {
+			case p.Pong != nil:
+				log.Debug().Int64("ms", time.Now().UnixMilli()-p.Pong.Time).Msg("ping")
+				break
+			case p.Requests != nil:
+				go func(conn net.Conn) {
+					resp, err := listener(p.Requests)
+					if err != nil {
+						log.Error().Err(err).Msg("error in listener")
+						return
+					}
+					resp.Id = p.Requests.Id
+					resp.Name = p.Requests.Name
+					p := &pproto.Packet{
+						Responses: resp,
+					}
+					b, err := proto.Marshal(p)
+					if err != nil {
+						log.Error().Err(err).Msg("error marshal response")
+						return
+					}
+					_, err = conn.Write(bit_utils.AddSize(b))
+					if err != nil {
+						log.Error().Err(err).Msg("error send data")
+						return
+					}
+				}(conn)
+			}
+
 		}
-		var p pproto.Packet
-		err = proto.Unmarshal(b, &p)
-		if err != nil {
-			return err
-		}
-		switch {
-		case p.Pong != nil:
-			log.Debug().Int64("ms", time.Now().UnixMilli()-p.Pong.Time).Msg("ping")
-			break
-		case p.Requests != nil:
-			go func(conn net.Conn) {
-				resp, err := listener(p.Requests)
-				if err != nil {
-					log.Error().Err(err).Msg("error in listener")
-					return
-				}
-				resp.Id = p.Requests.Id
-				resp.Name = p.Requests.Name
-				p := &pproto.Packet{
-					Responses: resp,
-				}
-				b, err := proto.Marshal(p)
-				if err != nil {
-					log.Error().Err(err).Msg("error marshal response")
-					return
-				}
-				_, err = conn.Write(bit_utils.AddSize(b))
-				if err != nil {
-					log.Error().Err(err).Msg("error send data")
-					return
-				}
-			}(conn)
-		}
+	}()
+	err = readerTL(conn, dataChannel)
+	if err != nil {
+		log.Error().Err(err).Msg("read error")
 	}
+
+	//for {
+	//	b, err := readTL(conn)
+	//	if err != nil {
+	//		return err
+	//	}
+	//	var p pproto.Packet
+	//	err = proto.Unmarshal(b, &p)
+	//	if err != nil {
+	//		return err
+	//	}
+	//	switch {
+	//	case p.Pong != nil:
+	//		log.Debug().Int64("ms", time.Now().UnixMilli()-p.Pong.Time).Msg("ping")
+	//		break
+	//	case p.Requests != nil:
+	//		go func(conn net.Conn) {
+	//			resp, err := listener(p.Requests)
+	//			if err != nil {
+	//				log.Error().Err(err).Msg("error in listener")
+	//				return
+	//			}
+	//			resp.Id = p.Requests.Id
+	//			resp.Name = p.Requests.Name
+	//			p := &pproto.Packet{
+	//				Responses: resp,
+	//			}
+	//			b, err := proto.Marshal(p)
+	//			if err != nil {
+	//				log.Error().Err(err).Msg("error marshal response")
+	//				return
+	//			}
+	//			_, err = conn.Write(bit_utils.AddSize(b))
+	//			if err != nil {
+	//				log.Error().Err(err).Msg("error send data")
+	//				return
+	//			}
+	//		}(conn)
+	//	}
+	//}
+	return err
 }
 
 func handshake(conn net.Conn, name string) error {

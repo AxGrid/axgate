@@ -86,21 +86,44 @@ func connection(conn *GateConn) {
 		conn.log.Error().Err(err).Msg("set timeout error")
 		return
 	}
-	for {
-		b, err := readTL(conn)
-		_ = conn.SetReadDeadline(time.Now().Add(connectionTTL))
-		if err != nil {
-			conn.log.Error().Err(err).Msg("read-tl error")
-			return
+	dataChannel := make(chan []byte)
+	go func() {
+		for {
+			data, ok := <-dataChannel
+			if !ok {
+				conn.log.Debug().Msg("channel closed")
+				return
+			}
+			var p pproto.Packet
+			err = proto.Unmarshal(data, &p)
+			if err != nil {
+				conn.log.Error().Err(err).Msg("fail to unmarshal")
+				conn.Close()
+				return
+			}
+			go process(&p, conn)
 		}
-		var p pproto.Packet
-		err = proto.Unmarshal(b, &p)
-		if err != nil {
-			conn.log.Error().Err(err).Msg("fail to unmarshal proto")
-			return
-		}
-		go process(&p, conn)
+	}()
+	err = readerTL(conn, dataChannel)
+	if err != nil {
+		conn.log.Error().Err(err).Msg("read error")
 	}
+
+	//for {
+	//	b, err := readTL(conn)
+	//	_ = conn.SetReadDeadline(time.Now().Add(connectionTTL))
+	//	if err != nil {
+	//		conn.log.Error().Err(err).Msg("read-tl error")
+	//		return
+	//	}
+	//	var p pproto.Packet
+	//	err = proto.Unmarshal(b, &p)
+	//	if err != nil {
+	//		conn.log.Error().Err(err).Msg("fail to unmarshal proto")
+	//		return
+	//	}
+	//	go process(&p, conn)
+	//}
 }
 
 func process(p *pproto.Packet, conn *GateConn) {
@@ -150,14 +173,51 @@ func readTL(conn net.Conn) ([]byte, error) {
 	if sizeLen != 4 {
 		return nil, errors.New("wrong size read length")
 	}
+
 	size := bit_utils.GetUInt32FromBytes(sizeBuf)
+	log.Info().Hex("hex", sizeBuf).Uint32("size", size).Msg("read size")
 	dataBuf := make([]byte, size)
 	dataLen, err := conn.Read(dataBuf)
 	if err != nil {
 		return nil, err
 	}
+
 	if uint32(dataLen) != size {
 		return nil, fmt.Errorf("wrong data read length. wait:%d read:%d", size, uint32(dataLen))
 	}
 	return dataBuf, nil
+}
+
+func readerTL(conn net.Conn, dataChannel chan []byte) error {
+	defer conn.Close()
+	buf := make([]byte, 4096)
+	var data []byte
+	for {
+		i, err := conn.Read(buf)
+
+		if err != nil {
+			log.Error().Err(err).Msg("fail to read")
+			return err
+		}
+		if i == 0 {
+			log.Error().Err(err).Msg("connection closed")
+			return errors.New("connection closed")
+		}
+		_ = conn.SetReadDeadline(time.Now().Add(connectionTTL))
+		data = append(data, buf[:i]...)
+		for { // Нужен если получили 2-ва пакета вместе
+			ld := len(data)
+			if ld >= 4 {
+				l4 := bit_utils.GetUInt32FromBytes(data[:4])
+				if uint32(ld) >= l4+4 {
+					dataChannel <- data[4 : l4+4]
+					data = data[l4+4:]
+				} else {
+					break
+				}
+			} else {
+				break
+			}
+		}
+	}
 }
