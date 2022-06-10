@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"bytes"
+	_ "embed"
 	"fmt"
 	pproto "github.com/axgrid/axgate/proto"
 	"github.com/axgrid/axgate/tcp"
@@ -8,10 +10,14 @@ import (
 	"github.com/go-chi/httplog"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"html/template"
 	"net/http"
 	"regexp"
 	"strings"
 )
+
+//go:embed "template/index.gohtml"
+var index []byte
 
 func NewHandler(httpAddress string, hosts []string, verbose bool) error {
 	var stringHost string
@@ -40,7 +46,7 @@ func NewHandler(httpAddress string, hosts []string, verbose bool) error {
 	r.HandleFunc("/*", func(w http.ResponseWriter, r *http.Request) {
 		matches := hostMatcher.FindStringSubmatch(r.Host)
 		if len(matches) == 0 {
-			root(w, r)
+			root(w, r, hosts[0])
 		} else {
 			err := service(matches[1], w, r)
 			if err != nil {
@@ -53,10 +59,22 @@ func NewHandler(httpAddress string, hosts []string, verbose bool) error {
 	return http.ListenAndServe(httpAddress, r)
 }
 
-func root(w http.ResponseWriter, r *http.Request) {
-	log.Info().Msg("ROOT!")
-	w.Header().Set("x-gate", "root")
-	w.Write(([]byte)("ROOT"))
+func root(w http.ResponseWriter, r *http.Request, host string) {
+	var res []*Info
+	for _, name := range tcp.GetServicesNames() {
+		res = append(res, &Info{
+			Name: name,
+			Url:  fmt.Sprintf("http://%s.%s", name, host),
+		})
+	}
+
+	b, err := render(index, res)
+	if err != nil {
+		w.WriteHeader(500)
+		w.Write([]byte(err.Error()))
+	}
+	w.WriteHeader(200)
+	w.Write(b)
 }
 
 func service(name string, w http.ResponseWriter, r *http.Request) (err error) {
@@ -71,4 +89,24 @@ func service(name string, w http.ResponseWriter, r *http.Request) (err error) {
 	}
 	rs := <-c
 	return rs.ToHttp(w)
+}
+
+func render(templateByte []byte, data interface{}) ([]byte, error) {
+	t, err := template.New("").Parse(string(templateByte))
+	if err != nil {
+		log.Error().Err(err).Msg("failed to create template")
+		return nil, err
+	}
+	var tpl bytes.Buffer
+	err = t.Execute(&tpl, data)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to render template")
+		return nil, err
+	}
+	return tpl.Bytes(), nil
+}
+
+type Info struct {
+	Name string
+	Url  string
 }

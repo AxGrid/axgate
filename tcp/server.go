@@ -27,6 +27,14 @@ type GateConn struct {
 	log      zerolog.Logger
 }
 
+func GetServicesNames() []string {
+	var res []string
+	for k := range services {
+		res = append(res, k)
+	}
+	return res
+}
+
 func Send(request *pproto.GateRequest) (chan *pproto.GateResponse, error) {
 	servicesLock.Lock()
 	defer servicesLock.Unlock()
@@ -91,7 +99,7 @@ func connection(conn *GateConn) {
 		for {
 			data, ok := <-dataChannel
 			if !ok {
-				conn.log.Debug().Msg("channel closed")
+				conn.log.Info().Msg("channel closed")
 				return
 			}
 			var p pproto.Packet
@@ -108,22 +116,6 @@ func connection(conn *GateConn) {
 	if err != nil {
 		conn.log.Error().Err(err).Msg("read error")
 	}
-
-	//for {
-	//	b, err := readTL(conn)
-	//	_ = conn.SetReadDeadline(time.Now().Add(connectionTTL))
-	//	if err != nil {
-	//		conn.log.Error().Err(err).Msg("read-tl error")
-	//		return
-	//	}
-	//	var p pproto.Packet
-	//	err = proto.Unmarshal(b, &p)
-	//	if err != nil {
-	//		conn.log.Error().Err(err).Msg("fail to unmarshal proto")
-	//		return
-	//	}
-	//	go process(&p, conn)
-	//}
 }
 
 func process(p *pproto.Packet, conn *GateConn) {
@@ -164,30 +156,6 @@ func process(p *pproto.Packet, conn *GateConn) {
 	}
 }
 
-func readTL(conn net.Conn) ([]byte, error) {
-	sizeBuf := make([]byte, 4)
-	sizeLen, err := conn.Read(sizeBuf)
-	if err != nil {
-		return nil, err
-	}
-	if sizeLen != 4 {
-		return nil, errors.New("wrong size read length")
-	}
-
-	size := bit_utils.GetUInt32FromBytes(sizeBuf)
-	log.Info().Hex("hex", sizeBuf).Uint32("size", size).Msg("read size")
-	dataBuf := make([]byte, size)
-	dataLen, err := conn.Read(dataBuf)
-	if err != nil {
-		return nil, err
-	}
-
-	if uint32(dataLen) != size {
-		return nil, fmt.Errorf("wrong data read length. wait:%d read:%d", size, uint32(dataLen))
-	}
-	return dataBuf, nil
-}
-
 func readerTL(conn net.Conn, dataChannel chan []byte) error {
 	defer conn.Close()
 	buf := make([]byte, 4096)
@@ -220,4 +188,11 @@ func readerTL(conn net.Conn, dataChannel chan []byte) error {
 			}
 		}
 	}
+}
+
+type ServicesInfo struct {
+	Name         string
+	Url          string
+	RequestCount int
+	ErrorsCount  int
 }
