@@ -157,7 +157,7 @@ func readTL(conn net.Conn) ([]byte, error) {
 		return nil, err
 	}
 	if uint32(dataLen) != size {
-		return nil, errors.New("wrong data read length")
+		return nil, fmt.Errorf("wrong data read length. wait:%d read:%d", size, uint32(dataLen))
 	}
 	return dataBuf, nil
 }
