@@ -1,16 +1,12 @@
 package tcp
 
 import (
-	"bytes"
-	"errors"
-	"fmt"
 	pproto "github.com/axgrid/axgate/proto"
 	bit_utils "github.com/axgrid/axgate/shared/bit-utils"
 	"github.com/rs/zerolog/log"
 	"google.golang.org/protobuf/proto"
 	"net"
 	"net/http"
-	"strings"
 	"time"
 )
 
@@ -136,45 +132,4 @@ func handshake(conn net.Conn, name string) error {
 		return err
 	}
 	return nil
-}
-
-func NewHTTPHandlerClient(name string, gateAddress string, handler http.Handler) error {
-	if handler == nil {
-		return errors.New("handler is nil")
-	}
-	return NewClient(name, gateAddress, func(request *pproto.GateRequest) (*pproto.GateResponse, error) {
-		wr := &ResponseWriter{
-			header: http.Header{},
-			code:   200,
-		}
-		hr, err := request.ToHttp()
-		if err != nil {
-			return nil, err
-		}
-		handler.ServeHTTP(wr, hr)
-		return wr.ToGate()
-	})
-}
-
-func NewHTTPClient(name string, gateAddress string, requestAddress string) error {
-	client := &http.Client{Transport: tr}
-	if strings.HasSuffix(requestAddress, "/") {
-		requestAddress = requestAddress[:len(requestAddress)-1]
-	}
-	return NewClient(name, gateAddress, func(request *pproto.GateRequest) (*pproto.GateResponse, error) {
-		httpRequest, err := http.NewRequest(request.Method, fmt.Sprintf("%s%s", requestAddress, request.Url), bytes.NewReader(request.Body))
-		if err != nil {
-			return nil, err
-		}
-		httpRequest.Header = pproto.FromGateHeader(request.Header)
-		httpResponse, err := client.Do(httpRequest)
-		if err != nil {
-			return nil, err
-		}
-		resp, err := pproto.NewGateResponse(httpResponse)
-		if err != nil {
-			return nil, err
-		}
-		return resp, nil
-	})
 }
