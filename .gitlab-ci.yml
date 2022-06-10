@@ -1,0 +1,22 @@
+stages:
+  - build
+
+build:
+  stage: build
+  image:
+    name: golang:1.17
+  only:
+    - master
+  tags:
+    - go
+  before_script:
+    - apt-get update -qq && apt-get install -y -qq protobuf-compiler
+  script:
+    - make build
+  artifacts:
+    name: "axgate"
+    paths:
+      - ./target/axgate-server.linux
+    expire_in: 1 week
+
+

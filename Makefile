@@ -16,7 +16,7 @@ csharp-proto:
 	./build-tools/protoc/$(PLATFORM)/protoc --csharp_out=./target/csharp_out/proto/gomino/ --proto_path=./protobufs/gomino ./protobufs/gomino/*.proto
 	cd ./target/csharp_out/proto/gomino/ && zip -r ../../../csharp-gomino-proto.zip ./
 
-prebuild: deps simple-proto
+prebuild: simple-proto
 
 test: prebuild
 	go test ./parts/axudp/...
