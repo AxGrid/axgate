@@ -24,7 +24,7 @@ func init() {
 	flag.StringVar(&httpAddress, "http", ":8081", "setup http bind address")
 	flag.StringVar(&uri, "hosts", "localhost:8081", "set http host names, (,)separate")
 	flag.StringVar(&tcpAddress, "tcp", ":9090", "set tcp bind address :9090")
-	flag.BoolVar(&verbose, "verbose", true, "show more debug lines")
+	flag.BoolVar(&verbose, "verbose", false, "show more debug lines")
 	flag.Parse()
 }
 
