@@ -12,6 +12,7 @@ message Packet {
     GateHandshake handshake = 3;
     GatePing ping = 4;
     GatePing pong = 5;
+
 }
 
 message GatePing {
@@ -47,6 +48,6 @@ message GateResponse {
 
 message GateHandshake {
     string service = 1;
-    bool watch_only = 2;
+    string key = 3;
 }
 

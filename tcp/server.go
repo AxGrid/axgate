@@ -59,17 +59,17 @@ func Send(request *pproto.GateRequest) (chan *pproto.GateResponse, error) {
 	return conn.requests[request.Id], nil
 }
 
-func NewServer(bindAddress string) error {
+func NewServer(bindAddress string, key string) error {
 	l, err := net.Listen("tcp", bindAddress)
 	if err != nil {
 		return err
 	}
 	log.Info().Str("address", bindAddress).Msg("start tcp-server")
-	listener(l)
+	listener(l, key)
 	return nil
 }
 
-func listener(l net.Listener) {
+func listener(l net.Listener, key string) {
 	for {
 		conn, err := l.Accept()
 		if err != nil {
@@ -82,11 +82,11 @@ func listener(l net.Listener) {
 			lock:     sync.Mutex{},
 			requests: map[uint64]chan *pproto.GateResponse{},
 		}
-		go connection(gc)
+		go connection(gc, key)
 	}
 }
 
-func connection(conn *GateConn) {
+func connection(conn *GateConn, key string) {
 	defer conn.Close()
 	conn.log = log.With().Str("remote-addr", conn.RemoteAddr().String()).Logger()
 	err := conn.SetReadDeadline(time.Now().Add(connectionTTL))
@@ -109,7 +109,8 @@ func connection(conn *GateConn) {
 				conn.Close()
 				return
 			}
-			go process(&p, conn)
+
+			go process(&p, conn, key)
 		}
 	}()
 	err = readerTL(conn, dataChannel)
@@ -118,9 +119,14 @@ func connection(conn *GateConn) {
 	}
 }
 
-func process(p *pproto.Packet, conn *GateConn) {
+func process(p *pproto.Packet, conn *GateConn, key string) {
 	switch {
 	case p.Handshake != nil && conn.name == "":
+		if key != "" && p.Handshake.Key != key {
+			conn.log.Error().Msg("unauthorized")
+			conn.Close()
+			return
+		}
 		conn.name = p.Handshake.Service
 		conn.log = conn.log.With().Str("service", conn.name).Logger()
 		conn.log.Info().Msg("handshake")

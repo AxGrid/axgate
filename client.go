@@ -17,7 +17,7 @@ var tr = &http.Transport{
 	DisableCompression: true,
 }
 
-func NewHTTPHandlerClient(name string, gateAddress string, handler http.Handler) error {
+func NewHTTPHandlerClient(name string, gateAddress string, handler http.Handler, args ...string) error {
 	if handler == nil {
 		return errors.New("handler is nil")
 	}
@@ -32,10 +32,10 @@ func NewHTTPHandlerClient(name string, gateAddress string, handler http.Handler)
 		}
 		handler.ServeHTTP(wr, hr)
 		return wr.ToGate()
-	})
+	}, args...)
 }
 
-func NewHTTPClient(name string, gateAddress string, requestAddress string) error {
+func NewHTTPClient(name string, gateAddress string, requestAddress string, args ...string) error {
 	client := &http.Client{Transport: tr}
 	if strings.HasSuffix(requestAddress, "/") {
 		requestAddress = requestAddress[:len(requestAddress)-1]
@@ -55,7 +55,7 @@ func NewHTTPClient(name string, gateAddress string, requestAddress string) error
 			return nil, err
 		}
 		return resp, nil
-	})
+	}, args...)
 }
 
 type ResponseWriter struct {

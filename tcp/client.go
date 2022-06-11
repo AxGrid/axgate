@@ -20,8 +20,12 @@ var tr = &http.Transport{
 
 type fListener func(request *pproto.GateRequest) (*pproto.GateResponse, error)
 
-func NewClient(name string, gateAddress string, listener fListener) (err error) {
+func NewClient(name string, gateAddress string, listener fListener, args ...string) (err error) {
 	log.Info().Str("name", name).Str("address", gateAddress).Msg("start gate-client")
+	key := ""
+	if len(args) > 0 {
+		key = args[0]
+	}
 	tcpAddr, err := net.ResolveTCPAddr("tcp", gateAddress)
 	if err != nil {
 		return err
@@ -33,7 +37,7 @@ func NewClient(name string, gateAddress string, listener fListener) (err error) 
 			time.Sleep(reconnectTTL)
 			continue
 		}
-		err = handshake(conn, name)
+		err = handshake(conn, name, key)
 		if err != nil {
 			log.Error().Err(err).Msg("fail to send handshake")
 			continue
@@ -170,10 +174,11 @@ func clientLoop(conn net.Conn, listener fListener) (err error) {
 	return err
 }
 
-func handshake(conn net.Conn, name string) error {
+func handshake(conn net.Conn, name string, key string) error {
 	pck := &pproto.Packet{
 		Handshake: &pproto.GateHandshake{
 			Service: name,
+			Key:     key,
 		},
 	}
 	data, err := proto.Marshal(pck)

@@ -18,6 +18,7 @@ var (
 	uri         string
 	tcpAddress  string
 	verbose     bool
+	key         string
 )
 
 func init() {
@@ -25,6 +26,7 @@ func init() {
 	flag.StringVar(&uri, "hosts", "localhost:8081", "set http host names, (,)separate")
 	flag.StringVar(&tcpAddress, "tcp", ":9090", "set tcp bind address :9090")
 	flag.BoolVar(&verbose, "verbose", false, "show more debug lines")
+	flag.StringVar(&key, "key", "", "set secret key")
 	flag.Parse()
 }
 
@@ -37,7 +39,7 @@ func main() {
 
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: "15:04:05,000"}).Level(level)
 	go func() {
-		err := tcp.NewServer(tcpAddress)
+		err := tcp.NewServer(tcpAddress, key)
 		if err != nil {
 			log.Fatal().Err(err).Msg("fail to start tcp server")
 		}
