@@ -23,5 +23,5 @@ AxGate Server
 
 
 ```shell
-
+axgate-server --tcp=":9090" --http=":80" --hosts="mydomain.com"
 ```
