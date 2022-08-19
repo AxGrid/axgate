@@ -98,7 +98,7 @@ func clientLoop(conn net.Conn, listener fListener) (err error) {
 
 			switch {
 			case p.Pong != nil:
-				log.Debug().Int64("ms", time.Now().UnixMilli()-p.Pong.Time).Msg("ping")
+				//log.Debug().Int64("ms", time.Now().UnixMilli()-p.Pong.Time).Msg("ping")
 				break
 			case p.Requests != nil:
 				go func(conn net.Conn) {
